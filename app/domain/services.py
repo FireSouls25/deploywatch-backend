@@ -36,7 +36,7 @@ def detect_provider(*texts: str | None) -> str:
         return "netlify"
     if "pages-build-deployment" in blob or "github-pages" in blob:
         return "github-pages"
-    if "github.com" in blob or "actions" in blob:
+    if "github" in blob or "actions" in blob:
         return "github-actions"
     return "external"
 
