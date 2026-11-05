@@ -6,6 +6,7 @@ from .repo import (
     DeployOutcome,
     DeployStatus,
     EnvironmentInfo,
+    ExternalCheckInfo,
     RunInfo,
     WorkflowInfo,
 )
@@ -13,6 +14,20 @@ from .repo import (
 _SUCCESS = {"success"}
 _FAILURE = {"failure", "error"}
 _ACTIVE_DEPLOYMENT = {"pending", "queued", "in_progress"}
+
+# Palabras que delatan un estado/check de despliegue aunque no haya
+# workflow propio: plataformas que despliegan desde su panel.
+DEPLOY_KEYWORDS = (
+    "deploy",
+    "pages",
+    "production",
+    "preview",
+    "cloudflare",
+    "vercel",
+    "netlify",
+    "workers",
+    "publish",
+)
 
 
 def _runs_of_deploy_workflows(
@@ -58,27 +73,68 @@ def _map_deployment(dep: DeploymentInfo) -> DeployStatus:
     )
 
 
+def _map_external_check(check: ExternalCheckInfo) -> DeployStatus:
+    state = check.state.lower()
+    if state in _SUCCESS:
+        return DeployStatus(
+            outcome=DeployOutcome.SUCCESS,
+            message=f"Despliegue externo '{check.name}' exitoso.",
+            needs_attention=False,
+            workflow_name=None,
+            run_url=check.url or None,
+        )
+    if state in _FAILURE:
+        return DeployStatus(
+            outcome=DeployOutcome.FAILURE,
+            message=f"Despliegue externo '{check.name}' falló.",
+            needs_attention=True,
+            workflow_name=None,
+            run_url=check.url or None,
+        )
+    return DeployStatus(
+        outcome=DeployOutcome.IN_PROGRESS,
+        message=f"Despliegue externo '{check.name}' en curso.",
+        needs_attention=False,
+        workflow_name=None,
+        run_url=check.url or None,
+    )
+
+
 def evaluate_deploy_status(
     workflows: list[WorkflowInfo],
     runs: list[RunInfo],
     deployments: list[DeploymentInfo] | None = None,
     environments: list[EnvironmentInfo] | None = None,
+    external_checks: list[ExternalCheckInfo] | None = None,
 ) -> DeployStatus:
-    """Decide el estado de despliegue combinando tres señales.
+    """Decide el estado de despliegue combinando cuatro señales.
 
     1. Deployments de GitHub (Cloudflare Pages, Vercel, Netlify...).
     2. Workflows con 'deploy' en nombre o ruta + sus ejecuciones.
-    3. Environments configurados sin actividad todavía.
+    3. Statuses/checks externos en la rama por defecto (despliegues
+       creados desde el panel de la plataforma, sin Actions propio).
+    4. Environments configurados sin actividad todavía.
+    Entre 1 y 2 manda el evento más reciente; 3 y 4 entran en ese orden.
     """
     deployments = list(deployments or [])
     environments = list(environments or [])
+    deploy_checks = [
+        c
+        for c in (external_checks or [])
+        if any(k in c.name.lower() for k in DEPLOY_KEYWORDS)
+    ]
     deploy_workflows = [w for w in workflows if w.looks_like_deploy()]
 
-    if not deploy_workflows and not deployments and not environments:
+    if (
+        not deploy_workflows
+        and not deployments
+        and not environments
+        and not deploy_checks
+    ):
         return DeployStatus(
             outcome=DeployOutcome.NO_DEPLOY_SETUP,
             message="Sin despliegue: no hay workflows de despliegue, "
-            "deployments ni environments.",
+            "deployments, checks externos ni environments.",
             needs_attention=True,
         )
 
@@ -119,6 +175,12 @@ def evaluate_deploy_status(
             workflow_name=primary.name,
             run_url=latest_run.html_url,
         )
+
+    # Sin deployments ni ejecuciones: valen los checks externos (p. ej.
+    # Cloudflare desplegando desde su panel) y, en último lugar,
+    # la infraestructura configurada pero sin actividad.
+    if deploy_checks:
+        return _map_external_check(deploy_checks[0])
 
     # Hay infraestructura (workflow o environment) pero nunca se usó.
     origin = deploy_workflows[0].name if deploy_workflows else environments[0].name

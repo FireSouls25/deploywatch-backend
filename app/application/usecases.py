@@ -55,7 +55,12 @@ async def check_repo_now(
         runs = await github.list_runs(gid)
         deployments = await github.list_deployments(gid)
         environments = await github.list_environments(gid)
+        external_checks = await github.list_external_checks(gid)
+    except FileNotFoundError:
+        raise
     except Exception as exc:
         raise GithubError(str(exc)) from exc
-    status = evaluate_deploy_status(workflows, runs, deployments, environments)
+    status = evaluate_deploy_status(
+        workflows, runs, deployments, environments, external_checks
+    )
     return checks.save(DeployCheck.create(tracked.id, status))

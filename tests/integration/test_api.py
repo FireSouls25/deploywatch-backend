@@ -21,6 +21,9 @@ class FakeGithub:
     async def list_environments(self, repo):
         return []
 
+    async def list_external_checks(self, repo):
+        return []
+
 
 def _client():
     repos, checks = InMemoryRepos(), InMemoryChecks()

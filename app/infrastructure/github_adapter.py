@@ -6,10 +6,32 @@ import httpx
 from app.domain.repo import (
     DeploymentInfo,
     EnvironmentInfo,
+    ExternalCheckInfo,
     GithubRepoId,
     RunInfo,
     WorkflowInfo,
 )
+
+
+def _normalize_state(state: str) -> str:
+    """Commit status -> success | failure | pending."""
+    s = state.lower()
+    if s == "success":
+        return "success"
+    if s in ("failure", "error"):
+        return "failure"
+    return "pending"
+
+
+def _normalize_check_run(status: str, conclusion: str | None) -> str:
+    """Check run -> success | failure | pending."""
+    if status != "completed":
+        return "pending"
+    if conclusion == "success":
+        return "success"
+    if conclusion in ("failure", "timed_out", "action_required"):
+        return "failure"
+    return "pending"
 
 
 class GithubApiAdapter:
@@ -95,6 +117,59 @@ class GithubApiAdapter:
             return "pending"
         items = resp.json()
         return items[0].get("state", "pending") if items else "pending"
+
+    async def list_external_checks(
+        self, repo: GithubRepoId
+    ) -> list[ExternalCheckInfo]:
+        """Statuses y checks del HEAD de la rama por defecto.
+
+        Cubre el caso Cloudflare-desde-el-panel: sin Actions propio ni
+        Deployments, la plataforma reporta aquí (contexto 'Cloudflare
+        Pages', checks de 'pages-build-deployment', etc.).
+        """
+        async with httpx.AsyncClient(headers=self._headers, timeout=10) as client:
+            info = await client.get(f"{self._base}/repos/{repo.full_name}")
+            if info.status_code == 404:
+                raise FileNotFoundError(
+                    f"Repo {repo.full_name} not found on GitHub."
+                )
+            info.raise_for_status()
+            branch = info.json().get("default_branch", "main")
+
+            out: list[ExternalCheckInfo] = []
+            status_resp = await client.get(
+                f"{self._base}/repos/{repo.full_name}/commits/{branch}/status"
+            )
+            if status_resp.is_success:
+                for st in status_resp.json().get("statuses", []):
+                    out.append(
+                        ExternalCheckInfo(
+                            kind="status",
+                            name=st.get("context", ""),
+                            state=_normalize_state(st.get("state", "")),
+                            url=st.get("target_url", "") or "",
+                            description=st.get("description", "") or "",
+                        )
+                    )
+            checks_resp = await client.get(
+                f"{self._base}/repos/{repo.full_name}/commits/"
+                f"{branch}/check-runs?per_page=20"
+            )
+            if checks_resp.is_success:
+                for run in checks_resp.json().get("check_runs", []):
+                    out.append(
+                        ExternalCheckInfo(
+                            kind="check",
+                            name=run.get("name", ""),
+                            state=_normalize_check_run(
+                                run.get("status", ""), run.get("conclusion")
+                            ),
+                            url=run.get("html_url", "") or "",
+                            description=run.get("output", {}).get("title", "")
+                            or "",
+                        )
+                    )
+            return out
 
     async def list_environments(self, repo: GithubRepoId) -> list[EnvironmentInfo]:
         url = f"{self._base}/repos/{repo.full_name}/environments"

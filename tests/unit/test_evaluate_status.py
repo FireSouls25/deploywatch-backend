@@ -1,4 +1,11 @@
-from app.domain.repo import DeploymentInfo, DeployOutcome, EnvironmentInfo, RunInfo, WorkflowInfo
+from app.domain.repo import (
+    DeploymentInfo,
+    DeployOutcome,
+    EnvironmentInfo,
+    ExternalCheckInfo,
+    RunInfo,
+    WorkflowInfo,
+)
 from app.domain.services import evaluate_deploy_status
 
 
@@ -87,5 +94,36 @@ def test_unrelated_ci_runs_do_not_count_as_deploys():
     s = evaluate_deploy_status(
         [WorkflowInfo(workflow_id=1, name="CI", path=".github/workflows/ci.yml")],
         [_run(status="completed", conclusion="success")],
+    )
+    assert s.outcome == DeployOutcome.NO_DEPLOY_SETUP
+
+
+def _check(name="Cloudflare Pages", state="success"):
+    return ExternalCheckInfo(kind="status", name=name, state=state,
+                             url="https://dash.cloudflare.com")
+
+
+def test_cloudflare_panel_deploy_without_actions_is_detected():
+    """El caso real: Worker/Pages desplegado desde el panel de Cloudflare,
+    sin Actions propio ni Deployments. Solo hay statuses en la rama."""
+    s = evaluate_deploy_status([], [], external_checks=[_check()])
+    assert (s.outcome, s.needs_attention) == (DeployOutcome.SUCCESS, False)
+    assert "Cloudflare Pages" in s.message
+
+
+def test_external_check_failure_needs_attention():
+    s = evaluate_deploy_status([], [], external_checks=[_check(state="failure")])
+    assert (s.outcome, s.needs_attention) == (DeployOutcome.FAILURE, True)
+
+
+def test_external_check_pending_is_in_progress():
+    s = evaluate_deploy_status([], [], external_checks=[_check(state="pending")])
+    assert s.outcome == DeployOutcome.IN_PROGRESS
+
+
+def test_unrelated_statuses_are_ignored():
+    s = evaluate_deploy_status(
+        [], [],
+        external_checks=[_check(name="ci / tests", state="success")],
     )
     assert s.outcome == DeployOutcome.NO_DEPLOY_SETUP

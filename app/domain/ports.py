@@ -7,6 +7,7 @@ from .repo import (
     DeployCheck,
     DeploymentInfo,
     EnvironmentInfo,
+    ExternalCheckInfo,
     GithubRepoId,
     RunInfo,
     TrackedRepo,
@@ -28,6 +29,14 @@ class GithubGateway(Protocol):
 
     async def list_environments(self, repo: GithubRepoId) -> list[EnvironmentInfo]:
         ...
+
+    async def list_external_checks(
+        self, repo: GithubRepoId
+    ) -> list[ExternalCheckInfo]:
+        """Statuses y checks del HEAD de la rama por defecto.
+
+        Cubre plataformas que despliegan desde su panel sin Actions propio.
+        """
 
 
 class RepoRepository(Protocol):

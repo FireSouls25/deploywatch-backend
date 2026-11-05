@@ -89,6 +89,24 @@ class EnvironmentInfo:
 
 
 @dataclass(frozen=True)
+class ExternalCheckInfo:
+    """Estado publicado en el HEAD de la rama por defecto.
+
+    Plataformas como Cloudflare Pages/Workers, cuando despliegan desde su
+    propio panel sin Actions en el repo, no crean Deployments: reportan
+    con commit statuses (contexto 'Cloudflare Pages') y check runs.
+    kind: 'status' (contexto de commit) o 'check' (check run).
+    state normalizado: 'success' | 'failure' | 'pending'.
+    """
+
+    kind: str
+    name: str
+    state: str
+    url: str = ""
+    description: str = ""
+
+
+@dataclass(frozen=True)
 class DeployStatus:
     outcome: DeployOutcome
     message: str
