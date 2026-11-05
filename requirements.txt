@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg[binary]
+httpx
+pydantic
+pytest
+pytest-asyncio
+coverage
+ruff

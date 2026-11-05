@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: deploywatch
+      POSTGRES_PASSWORD: deploywatch
+      POSTGRES_DB: deploywatch
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deploywatch"]
+      interval: 5s
+      retries: 10
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://deploywatch:deploywatch@db:5432/deploywatch
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    ports: ["8000:8000"]
+    depends_on: [db]
+
+volumes:
+  pgdata:
