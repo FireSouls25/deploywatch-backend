@@ -15,6 +15,31 @@ _SUCCESS = {"success"}
 _FAILURE = {"failure", "error"}
 _ACTIVE_DEPLOYMENT = {"pending", "queued", "in_progress"}
 
+
+def detect_provider(*texts: str | None) -> str:
+    """Deduce la plataforma a partir de nombres y URLs.
+
+    Devuelve cloudflare | vercel | netlify | github-pages |
+    github-actions | external. El llamador decide 'none'.
+    """
+    blob = " ".join(t or "" for t in texts).lower()
+    if (
+        "cloudflare" in blob
+        or "workers" in blob
+        or "pages.dev" in blob
+        or "dash.cloudflare" in blob
+    ):
+        return "cloudflare"
+    if "vercel" in blob:
+        return "vercel"
+    if "netlify" in blob:
+        return "netlify"
+    if "pages-build-deployment" in blob or "github-pages" in blob:
+        return "github-pages"
+    if "github.com" in blob or "actions" in blob:
+        return "github-actions"
+    return "external"
+
 # Palabras que delatan un estado/check de despliegue aunque no haya
 # workflow propio: plataformas que despliegan desde su panel.
 DEPLOY_KEYWORDS = (
@@ -48,6 +73,7 @@ def _runs_of_deploy_workflows(
 
 def _map_deployment(dep: DeploymentInfo) -> DeployStatus:
     state = dep.state.lower()
+    provider = detect_provider(dep.target_url, dep.environment)
     if state in _SUCCESS:
         return DeployStatus(
             outcome=DeployOutcome.SUCCESS,
@@ -55,6 +81,7 @@ def _map_deployment(dep: DeploymentInfo) -> DeployStatus:
             needs_attention=False,
             workflow_name=None,
             run_url=dep.target_url or None,
+            provider=provider,
         )
     if state in _FAILURE:
         return DeployStatus(
@@ -63,6 +90,7 @@ def _map_deployment(dep: DeploymentInfo) -> DeployStatus:
             needs_attention=True,
             workflow_name=None,
             run_url=dep.target_url or None,
+            provider=provider,
         )
     return DeployStatus(
         outcome=DeployOutcome.IN_PROGRESS,
@@ -70,11 +98,13 @@ def _map_deployment(dep: DeploymentInfo) -> DeployStatus:
         needs_attention=False,
         workflow_name=None,
         run_url=dep.target_url or None,
+        provider=provider,
     )
 
 
 def _map_external_check(check: ExternalCheckInfo) -> DeployStatus:
     state = check.state.lower()
+    provider = detect_provider(check.name, check.url)
     if state in _SUCCESS:
         return DeployStatus(
             outcome=DeployOutcome.SUCCESS,
@@ -82,6 +112,7 @@ def _map_external_check(check: ExternalCheckInfo) -> DeployStatus:
             needs_attention=False,
             workflow_name=None,
             run_url=check.url or None,
+            provider=provider,
         )
     if state in _FAILURE:
         return DeployStatus(
@@ -90,6 +121,7 @@ def _map_external_check(check: ExternalCheckInfo) -> DeployStatus:
             needs_attention=True,
             workflow_name=None,
             run_url=check.url or None,
+            provider=provider,
         )
     return DeployStatus(
         outcome=DeployOutcome.IN_PROGRESS,
@@ -97,6 +129,7 @@ def _map_external_check(check: ExternalCheckInfo) -> DeployStatus:
         needs_attention=False,
         workflow_name=None,
         run_url=check.url or None,
+        provider=provider,
     )
 
 
@@ -136,6 +169,7 @@ def evaluate_deploy_status(
             message="Sin despliegue: no hay workflows de despliegue, "
             "deployments, checks externos ni environments.",
             needs_attention=True,
+            provider="none",
         )
 
     deploy_runs = _runs_of_deploy_workflows(deploy_workflows, runs)
@@ -151,6 +185,7 @@ def evaluate_deploy_status(
 
     if latest_run is not None:
         primary = deploy_workflows[0]
+        provider = detect_provider(primary.name, primary.path, latest_run.html_url)
         if latest_run.status != "completed":
             return DeployStatus(
                 outcome=DeployOutcome.IN_PROGRESS,
@@ -158,6 +193,7 @@ def evaluate_deploy_status(
                 needs_attention=False,
                 workflow_name=primary.name,
                 run_url=latest_run.html_url,
+                provider=provider,
             )
         if latest_run.conclusion == "success":
             return DeployStatus(
@@ -166,6 +202,7 @@ def evaluate_deploy_status(
                 needs_attention=False,
                 workflow_name=primary.name,
                 run_url=latest_run.html_url,
+                provider=provider,
             )
         return DeployStatus(
             outcome=DeployOutcome.FAILURE,
@@ -174,6 +211,7 @@ def evaluate_deploy_status(
             needs_attention=True,
             workflow_name=primary.name,
             run_url=latest_run.html_url,
+            provider=provider,
         )
 
     # Sin deployments ni ejecuciones: valen los checks externos (p. ej.
@@ -184,9 +222,11 @@ def evaluate_deploy_status(
 
     # Hay infraestructura (workflow o environment) pero nunca se usó.
     origin = deploy_workflows[0].name if deploy_workflows else environments[0].name
+    origin_path = deploy_workflows[0].path if deploy_workflows else ""
     return DeployStatus(
         outcome=DeployOutcome.NEVER_DEPLOYED,
         message=f"'{origin}' existe pero nunca se ha desplegado.",
         needs_attention=True,
         workflow_name=deploy_workflows[0].name if deploy_workflows else None,
+        provider=detect_provider(origin, origin_path),
     )

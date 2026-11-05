@@ -6,11 +6,18 @@ from functools import lru_cache
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
-from app.infrastructure.db import Base, SqlCheckRepository, SqlRepoRepository, make_engine
+from app.infrastructure.db import (
+    Base,
+    SqlCheckRepository,
+    SqlRepoRepository,
+    ensure_provider_column,
+    make_engine,
+)
 from app.infrastructure.github_adapter import GithubApiAdapter
 
 _engine = make_engine(settings.database_url)
 Base.metadata.create_all(_engine)
+ensure_provider_column(_engine)
 _session_factory = sessionmaker(bind=_engine)
 
 _repo_repo = SqlRepoRepository(_session_factory)

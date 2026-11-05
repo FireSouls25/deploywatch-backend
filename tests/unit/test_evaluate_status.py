@@ -6,7 +6,7 @@ from app.domain.repo import (
     RunInfo,
     WorkflowInfo,
 )
-from app.domain.services import evaluate_deploy_status
+from app.domain.services import detect_provider, evaluate_deploy_status
 
 
 def _wf(name="Deploy to prod"):
@@ -98,9 +98,8 @@ def test_unrelated_ci_runs_do_not_count_as_deploys():
     assert s.outcome == DeployOutcome.NO_DEPLOY_SETUP
 
 
-def _check(name="Cloudflare Pages", state="success"):
-    return ExternalCheckInfo(kind="status", name=name, state=state,
-                             url="https://dash.cloudflare.com")
+def _check(name="Cloudflare Pages", state="success", url="https://dash.cloudflare.com"):
+    return ExternalCheckInfo(kind="status", name=name, state=state, url=url)
 
 
 def test_cloudflare_panel_deploy_without_actions_is_detected():
@@ -127,3 +126,26 @@ def test_unrelated_statuses_are_ignored():
         external_checks=[_check(name="ci / tests", state="success")],
     )
     assert s.outcome == DeployOutcome.NO_DEPLOY_SETUP
+
+
+def test_detect_provider():
+    assert detect_provider("Cloudflare Pages", "https://pages.dev/x") == "cloudflare"
+    assert detect_provider("Workers Builds: app") == "cloudflare"
+    assert detect_provider("Vercel", "https://app.vercel.app") == "vercel"
+    assert detect_provider("netlify-build", "https://app.netlify.app") == "netlify"
+    assert detect_provider("pages-build-deployment") == "github-pages"
+    assert detect_provider("deploy", "https://github.com/o/r/actions") == "github-actions"
+    assert detect_provider("misterio") == "external"
+
+
+def test_provider_flows_into_status():
+    s = evaluate_deploy_status([], [], external_checks=[_check()])
+    assert s.provider == "cloudflare"
+    s = evaluate_deploy_status(
+        [], [], external_checks=[_check(name="Vercel", url="https://app.vercel.app")]
+    )
+    assert s.provider == "vercel"
+    s = evaluate_deploy_status([_wf()], [_run(conclusion="success")])
+    assert s.provider == "github-actions"
+    s = evaluate_deploy_status([], [], [])
+    assert s.provider == "none"

@@ -24,6 +24,7 @@ def _check_to_dict(check) -> dict | None:
         "checked_at": check.checked_at.isoformat(),
         "needs_attention": check.outcome
         in (DeployOutcome.FAILURE, DeployOutcome.NO_DEPLOY_SETUP, DeployOutcome.NEVER_DEPLOYED),
+        "provider": check.provider,
     }
 
 

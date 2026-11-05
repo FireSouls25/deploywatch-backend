@@ -30,6 +30,18 @@ class DeployCheckRow(Base):
     workflow_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     run_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    provider: Mapped[str] = mapped_column(String(30), default="external")
+
+
+def ensure_provider_column(engine) -> None:
+    """Migración ligera: añade provider a BD creadas antes que la columna."""
+    from sqlalchemy import inspect, text
+
+    with engine.connect() as conn:
+        cols = [c["name"] for c in inspect(conn).get_columns("deploy_checks")]
+        if "provider" not in cols:
+            conn.execute(text("ALTER TABLE deploy_checks ADD COLUMN provider VARCHAR(30)"))
+            conn.commit()
 
 
 def make_engine(url: str):
@@ -102,7 +114,7 @@ class SqlCheckRepository:
                     id=check.id, repo_id=check.repo_id,
                     outcome=check.outcome.value, message=check.message,
                     workflow_name=check.workflow_name, run_url=check.run_url,
-                    checked_at=check.checked_at,
+                    checked_at=check.checked_at, provider=check.provider,
                 )
             )
             s.commit()
@@ -121,6 +133,7 @@ class SqlCheckRepository:
                     outcome=DeployOutcome(r.outcome), message=r.message,
                     workflow_name=r.workflow_name, run_url=r.run_url,
                     checked_at=r.checked_at,
+                    provider=getattr(r, "provider", None) or "external",
                 )
                 if r else None
             )

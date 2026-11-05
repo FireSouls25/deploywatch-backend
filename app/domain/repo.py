@@ -113,6 +113,9 @@ class DeployStatus:
     needs_attention: bool
     workflow_name: str | None = None
     run_url: str | None = None
+    # Plataforma que desplegó: cloudflare | vercel | netlify |
+    # github-actions | github-pages | external | none
+    provider: str = "external"
 
 
 @dataclass
@@ -140,6 +143,7 @@ class DeployCheck:
     workflow_name: str | None
     run_url: str | None
     checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    provider: str = "external"
 
     @classmethod
     def create(
@@ -152,4 +156,5 @@ class DeployCheck:
             message=status.message,
             workflow_name=status.workflow_name,
             run_url=status.run_url,
+            provider=status.provider,
         )

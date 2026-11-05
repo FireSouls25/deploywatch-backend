@@ -38,6 +38,12 @@ no hace pasar por desplegado a un repo que jamás desplegó. Entre deployments
 y ejecuciones manda el evento más reciente; después entran los checks
 externos y, en último lugar, la infraestructura sin actividad.
 
+Cada chequeo devuelve además `provider`: `cloudflare` | `vercel` |
+`netlify` | `github-actions` | `github-pages` | `external` | `none`
+(sin despliegue). Se deduce de nombres de workflows, checks y URLs, y se
+guarda en la tabla `deploy_checks` (las BD anteriores se migran solas al
+arrancar).
+
 | Situación | `outcome` | `needs_attention` |
 |---|---|---|
 | Sin ninguna señal | `no_deploy_setup` | 🔔 sí |
