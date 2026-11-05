@@ -22,15 +22,24 @@ app/
 
 ### Regla de dominio
 
-Un repo «tiene despliegue» si algún workflow contiene `deploy` en nombre o ruta.
+Un repo «tiene despliegue» si cumple alguna de estas tres señales:
+
+1. Algún workflow contiene `deploy` en nombre o ruta.
+2. La API de Deployments registra despliegues (aquí publican Cloudflare Pages,
+   Vercel o Netlify cuando su integración de GitHub está conectada).
+3. El repo tiene environments configurados (p. ej. `github-pages`).
+
+Solo cuentan las ejecuciones cuyo workflow parece de despliegue: un CI en verde
+no hace pasar por desplegado a un repo que jamás desplegó. Cuando hay varias
+señales, manda el evento más reciente.
 
 | Situación | `outcome` | `needs_attention` |
 |---|---|---|
-| Sin workflow de despliegue | `no_deploy_setup` | 🔔 sí |
-| Con workflow pero sin ejecuciones | `never_deployed` | 🔔 sí |
-| Última ejecución en curso | `in_progress` | no |
-| Última ejecución exitosa | `success` | no |
-| Última ejecución fallida | `failure` | 🔔 sí |
+| Sin ninguna señal | `no_deploy_setup` | 🔔 sí |
+| Infraestructura existente sin actividad | `never_deployed` | 🔔 sí |
+| Último despliegue en curso | `in_progress` | no |
+| Último despliegue exitoso | `success` | no |
+| Último despliegue fallido | `failure` | 🔔 sí |
 
 ## Requisitos
 

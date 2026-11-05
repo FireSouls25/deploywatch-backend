@@ -15,6 +15,12 @@ class FakeGithub:
                     html_url="http://run")
         ]
 
+    async def list_deployments(self, repo):
+        return []
+
+    async def list_environments(self, repo):
+        return []
+
 
 def _client():
     repos, checks = InMemoryRepos(), InMemoryChecks()

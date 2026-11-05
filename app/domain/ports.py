@@ -3,7 +3,15 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .repo import DeployCheck, GithubRepoId, RunInfo, TrackedRepo, WorkflowInfo
+from .repo import (
+    DeployCheck,
+    DeploymentInfo,
+    EnvironmentInfo,
+    GithubRepoId,
+    RunInfo,
+    TrackedRepo,
+    WorkflowInfo,
+)
 
 
 class GithubGateway(Protocol):
@@ -13,6 +21,12 @@ class GithubGateway(Protocol):
     async def list_runs(
         self, repo: GithubRepoId, workflow_name: str | None = None
     ) -> list[RunInfo]:
+        ...
+
+    async def list_deployments(self, repo: GithubRepoId) -> list[DeploymentInfo]:
+        """Deployments de GitHub: aquí publican Cloudflare, Vercel, Netlify..."""
+
+    async def list_environments(self, repo: GithubRepoId) -> list[EnvironmentInfo]:
         ...
 
 

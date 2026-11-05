@@ -6,14 +6,22 @@ from app.infrastructure.memory import InMemoryChecks, InMemoryRepos
 
 
 class FakeGithub:
-    def __init__(self, workflows, runs):
+    def __init__(self, workflows, runs, deployments=None, environments=None):
         self._wf, self._runs = workflows, runs
+        self._deps = deployments or []
+        self._envs = environments or []
 
     async def list_workflows(self, repo):
         return self._wf
 
     async def list_runs(self, repo, workflow_name=None):
         return self._runs
+
+    async def list_deployments(self, repo):
+        return self._deps
+
+    async def list_environments(self, repo):
+        return self._envs
 
 
 async def test_track_and_check_success():

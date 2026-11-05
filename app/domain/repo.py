@@ -68,6 +68,27 @@ class RunInfo:
 
 
 @dataclass(frozen=True)
+class DeploymentInfo:
+    """Un despliegue registrado en la API de Deployments de GitHub.
+
+    Aquí aparecen los despliegues de plataformas externas (Cloudflare Pages,
+    Vercel, Netlify) cuando el repo tiene su integración de GitHub conectada,
+    aunque no exista ningún workflow con 'deploy' en el nombre.
+    """
+
+    deployment_id: int
+    environment: str
+    state: str  # success | failure | error | pending | queued | in_progress
+    target_url: str = ""
+    created_at: str = ""
+
+
+@dataclass(frozen=True)
+class EnvironmentInfo:
+    name: str
+
+
+@dataclass(frozen=True)
 class DeployStatus:
     outcome: DeployOutcome
     message: str

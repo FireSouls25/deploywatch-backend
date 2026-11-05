@@ -53,7 +53,9 @@ async def check_repo_now(
     try:
         workflows = await github.list_workflows(gid)
         runs = await github.list_runs(gid)
+        deployments = await github.list_deployments(gid)
+        environments = await github.list_environments(gid)
     except Exception as exc:
         raise GithubError(str(exc)) from exc
-    status = evaluate_deploy_status(workflows, runs)
+    status = evaluate_deploy_status(workflows, runs, deployments, environments)
     return checks.save(DeployCheck.create(tracked.id, status))
