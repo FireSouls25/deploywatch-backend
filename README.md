@@ -73,6 +73,8 @@ Variables de entorno (`ver .env.example`):
 | `DATABASE_URL` | `sqlite:///./deploywatch.db` | Conexión SQLAlchemy (Postgres en Docker) |
 | `GITHUB_TOKEN` | — | Token personal para la API de GitHub |
 | `GITHUB_API` | `https://api.github.com` | Base de la API de GitHub |
+| `POSTGRES_PASSWORD` | — (obligatoria en compose) | Contraseña de Postgres; solo en `.env` |
+| `POSTGRES_USER` / `POSTGRES_DB` | `deploywatch` | Usuario y base de Postgres |
 
 ## API
 
@@ -99,10 +101,11 @@ coverage run -m pytest -q && coverage report
 ## Docker
 
 ```bash
-cp .env.example .env   # opcional: define GITHUB_TOKEN
+cp .env.example .env   # define POSTGRES_PASSWORD (y opcionalmente GITHUB_TOKEN)
 docker compose up --build
 # api: http://localhost:8000/api/health
 ```
 
-El `compose` levanta `db` (Postgres 16) + `api`. El frontend vive en su propio
+El `compose` levanta `db` (Postgres 16) + `api`; la API espera a que la base
+pase su healthcheck. Ninguna credencial vive en el repositorio. El frontend vive en su propio
 repo y consume esta API por `/api`.
