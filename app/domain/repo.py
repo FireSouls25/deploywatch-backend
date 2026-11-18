@@ -26,7 +26,7 @@ class GithubRepoId:
     def parse(cls, raw: str) -> GithubRepoId:
         """Accept 'owner/repo' or full github.com URLs."""
         raw = raw.strip().rstrip("/").removesuffix(".git")
-        m = re.search(r"github\.com[:/]([^/]+)/([^/]+)\s*$", raw)
+        m = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+)$", raw)
         if m:
             owner, repo = m.group(1), m.group(2)
         elif re.fullmatch(r"[\w.\-]+/[\w.\-]+", raw):
