@@ -221,12 +221,17 @@ def evaluate_deploy_status(
         return _map_external_check(deploy_checks[0])
 
     # Hay infraestructura (workflow o environment) pero nunca se usó.
-    origin = deploy_workflows[0].name if deploy_workflows else environments[0].name
-    origin_path = deploy_workflows[0].path if deploy_workflows else ""
+    workflow = next(iter(deploy_workflows), None)
+    environment = next(iter(environments), None)
+    if workflow is not None:
+        origin, origin_path = workflow.name, workflow.path
+    else:
+        origin = environment.name if environment else "despliegue"
+        origin_path = ""
     return DeployStatus(
         outcome=DeployOutcome.NEVER_DEPLOYED,
         message=f"'{origin}' existe pero nunca se ha desplegado.",
         needs_attention=True,
-        workflow_name=deploy_workflows[0].name if deploy_workflows else None,
+        workflow_name=workflow.name if workflow else None,
         provider=detect_provider(origin, origin_path),
     )
