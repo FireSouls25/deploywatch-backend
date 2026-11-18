@@ -61,7 +61,7 @@ arrancar).
 ## Instalación y uso local
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # app + pytest, coverage, ruff
 uvicorn app.main:app --reload --port 8000
 # salud: http://localhost:8000/api/health
 ```
@@ -97,6 +97,18 @@ coverage run -m pytest -q && coverage report
 - `tests/integration`: flujo HTTP con `TestClient` y gateway simulado.
 - CI (`.github/workflows/ci.yml`): lint + tests con cobertura + build Docker.
 - SonarCloud (`sonar-project.properties`): usa `coverage.xml` como reporte Python.
+
+## Dependencias
+
+Las versiones están fijadas. Se editan los `.in` y se regeneran los `.txt`:
+
+```bash
+uv pip compile requirements.in -o requirements.txt
+uv pip compile requirements-dev.in -o requirements-dev.txt
+```
+
+La imagen Docker instala solo `requirements.txt`, únicamente wheels y
+corre con un usuario sin privilegios.
 
 ## Docker
 
