@@ -1,27 +1,59 @@
 name: ci
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Acciones fijadas por SHA completo (versión en el comentario) para evitar
+# ataques a la cadena de suministro por etiquetas mutables.
 jobs:
-  backend:
+  test:
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install -r requirements-dev.txt
-      - run: ruff check app tests
-      - run: coverage run -m pytest -q && coverage xml && coverage report
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # Sonar necesita el historial para el "código nuevo"
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - run: pip install --only-binary ":all:" -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check app tests
+
+      - name: Pruebas + quality gate de cobertura (80 %)
+        run: |
+          coverage run -m pytest -q
+          coverage xml
+          coverage html
+          coverage report --fail-under=80
+
+      - name: Reporte HTML de cobertura
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-html
+          path: htmlcov/
+          if-no-files-found: ignore
+
+      # Se ejecuta en el mismo job para reutilizar coverage.xml.
+      - name: SonarCloud
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+
   docker:
     runs-on: ubuntu-latest
-    needs: [backend]
+    needs: [test]
     steps:
-      - uses: actions/checkout@v4
-      - run: docker compose build
-  sonar:
-    runs-on: ubuntu-latest
-    needs: [backend]
-    if: ${{ secrets.SONAR_TOKEN != '' }}
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: sonarsource/sonarcloud-github-action@v2
-        env: { SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -t deploywatch-backend:${{ github.sha }} .

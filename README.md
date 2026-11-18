@@ -94,9 +94,12 @@ coverage run -m pytest -q && coverage report
 ```
 
 - `tests/unit`: dominio (`GithubRepoId`, `evaluate_deploy_status`) y casos de uso con fakes en memoria.
-- `tests/integration`: flujo HTTP con `TestClient` y gateway simulado.
-- CI (`.github/workflows/ci.yml`): lint + tests con cobertura + build Docker.
-- SonarCloud (`sonar-project.properties`): usa `coverage.xml` como reporte Python.
+- `tests/integration`: flujo HTTP con `TestClient` sobre SQLite temporal, contrato
+  JSON Schema de `GET /api/repos` y respuestas de error parametrizadas.
+- CI (`.github/workflows/ci.yml`): lint → tests → **quality gate de cobertura (80 %)**
+  → reporte HTML como artifact → SonarCloud → build Docker. Acciones fijadas por SHA.
+- SonarCloud (`sonar-project.properties`): usa `coverage.xml`. Requiere el secreto
+  `SONAR_TOKEN` y tener desactivado *Automatic Analysis* en SonarCloud.
 
 ## Dependencias
 
