@@ -65,8 +65,16 @@ jobs:
           docker build -t "$IMAGE:$SHA" .
           docker push "$IMAGE:$SHA"
 
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-infra.txt
+
       - name: Aplicar infraestructura (CloudFormation en LocalStack)
-        run: ./infra/apply.sh staging
+        run: |
+          pip install --only-binary ":all:" --require-hashes -r requirements-infra.txt
+          python infra/localstack.py aplicar staging
 
       - name: Buscar la versión estable actual
         id: stable
@@ -79,7 +87,7 @@ jobs:
 
       - name: Desplegar en staging + smoke test (rollback si falla)
         id: deploy
-        run: ./scripts/deploy.sh "$IMAGE:$SHA" "${{ steps.stable.outputs.image }}"
+        run: python scripts/deploy.py "$IMAGE:$SHA" "${{ steps.stable.outputs.image }}"
 
       - name: Promover a estable
         if: success() && env.SIMULAR_FALLO != 'true'
@@ -90,8 +98,8 @@ jobs:
       - name: Registrar el despliegue (SQS + S3)
         if: always() && steps.deploy.outcome != 'skipped'
         run: |
-          ./infra/publish-event.sh "${{ steps.deploy.outputs.resultado || 'error' }}" "$SHA" "$IMAGE:$SHA" staging
-          ./infra/read-events.sh staging
+          python infra/localstack.py publicar "${{ steps.deploy.outputs.resultado || 'error' }}" "$SHA" "$IMAGE:$SHA" staging
+          python infra/localstack.py leer staging
 
       - name: Resumen
         if: always()

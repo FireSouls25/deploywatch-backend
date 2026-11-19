@@ -142,33 +142,38 @@ python -m venv .venv-load
 
 ## Demo local de todo el pipeline
 
-`scripts/demo-local.sh` reproduce en local, con Docker, cada etapa del pipeline:
+`scripts/demo.py` reproduce en local, con Docker, cada etapa del pipeline. Es Python
+puro, así que funciona igual en Linux, macOS y Windows (con Docker Desktop); en Windows
+usa `py` o `python` en lugar de `python3`.
 
 ```bash
-./scripts/demo-local.sh            # todo, en orden (~3 min)
-./scripts/demo-local.sh pruebas    # lint, pruebas y gate de cobertura
-./scripts/demo-local.sh despliegue # imagen + staging + smoke test + promoción
-./scripts/demo-local.sh rollback   # configuración rota → rollback automático
-./scripts/demo-local.sh carga      # Locust contra staging, con quality gate
-./scripts/demo-local.sh iac        # LocalStack: aplicar plantilla, publicar y leer eventos
-./scripts/demo-local.sh limpiar
+python3 scripts/demo.py             # todo, en orden (~2 min)
+python3 scripts/demo.py pruebas     # lint, pruebas y gate de cobertura
+python3 scripts/demo.py despliegue  # imagen, staging, smoke test y promoción
+python3 scripts/demo.py rollback    # configuración rota: rollback automático
+python3 scripts/demo.py carga       # Locust contra staging; deja locust-report.html
+python3 scripts/demo.py iac         # LocalStack: aplicar plantilla, publicar y leer eventos
+python3 scripts/demo.py limpiar
 ```
 
-Necesita libres los puertos 8000 (staging) y 4566 (LocalStack).
+La primera vez crea `.venv-demo` con las dependencias fijadas por hash. Necesita libres
+los puertos 8000 (staging) y 4566 (LocalStack). Los lockfiles son universales: incluyen
+los paquetes y las huellas de Linux, macOS y Windows.
 
 ## Despliegue continuo (CD)
 
 `.github/workflows/cd.yml` corre cuando el CI de `main` termina en verde:
 
 1. Construye la imagen y la publica en GHCR con el SHA del commit como etiqueta.
-2. `scripts/deploy.sh` levanta staging (Postgres + API) con la versión `:stable`
+2. `scripts/deploy.py` levanta staging (Postgres + API) con la versión `:stable`
    actual y la reemplaza por la nueva.
 3. **Smoke test** sobre `GET /api/health`. Si falla, **rollback** automático a
    `:stable` y el pipeline queda en rojo. Si pasa, la imagen nueva se promueve a `:stable`.
 4. Si existen los secretos `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`, avisa por Telegram.
 
 Para demostrar el rollback: *Actions → cd → Run workflow* con `simular_fallo` marcado
-(despliega la versión nueva con una `DATABASE_URL` inválida).
+(despliega la versión nueva con una `DATABASE_URL` inválida). En local:
+`python3 scripts/deploy.py <imagen-nueva> <imagen-estable> --simular-fallo`.
 
 ## Infraestructura como código (LocalStack)
 
@@ -184,11 +189,12 @@ en SQS y como reporte JSON en S3.
 
 ```bash
 docker compose --profile infra up -d localstack
-./infra/apply.sh staging          # idempotente: solo aplica diferencias
-./infra/publish-event.sh desplegado <sha> <imagen>
-./infra/read-events.sh staging
+pip install --only-binary ":all:" --require-hashes -r requirements-infra.txt
+python3 infra/localstack.py aplicar staging     # idempotente: solo aplica diferencias
+python3 infra/localstack.py publicar desplegado <sha> <imagen>
+python3 infra/localstack.py leer staging
 ```
 
-`infra/aws-local.sh` fuerza credenciales de prueba y el endpoint de LocalStack, así que
+`infra/localstack.py` fuerza credenciales de prueba y el endpoint de LocalStack, así que
 nunca toca una cuenta real. LocalStack está fijado en 4.14: las versiones posteriores
 exigen `LOCALSTACK_AUTH_TOKEN`.

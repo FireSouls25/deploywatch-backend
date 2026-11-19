@@ -29,7 +29,7 @@ jobs:
       - run: pip install --only-binary ":all:" --require-hashes -r requirements-dev.txt
 
       - name: Lint
-        run: ruff check app tests load
+        run: ruff check app tests load scripts infra
 
       - name: Pruebas + quality gate de cobertura (80 %)
         run: |
