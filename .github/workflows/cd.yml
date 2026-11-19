@@ -24,7 +24,14 @@ concurrency:
 
 jobs:
   staging:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Solo commits propios de main que pasaron el CI. Nunca código de un fork:
+    # el checkout usa github.sha (main) y exige que sea el commit que pasó el CI.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_sha == github.sha)
     runs-on: ubuntu-latest
     environment: staging
     # AWS emulado (IaC): cola de eventos y bucket de reportes de infra/stack.yml.
@@ -38,14 +45,12 @@ jobs:
           --health-cmd "curl -fs http://localhost:4566/_localstack/health"
           --health-interval 5s --health-retries 20
     env:
-      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      SHA: ${{ github.sha }}
       SIMULAR_FALLO: ${{ inputs.simular_fallo || 'false' }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ env.SHA }}
 
       - name: Login en GHCR
         env:
