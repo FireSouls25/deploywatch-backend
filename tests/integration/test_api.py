@@ -2,6 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from jsonschema import validate
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from app.api import deps
@@ -83,6 +84,7 @@ def client(monkeypatch, tmp_path, github):
     monkeypatch.setattr(deps, "get_repo_repo", lambda: repos)
     monkeypatch.setattr(deps, "get_check_repo", lambda: checks)
     monkeypatch.setattr(deps, "get_github", lambda: github)
+    monkeypatch.setattr(deps, "_engine", engine)
     return TestClient(app)
 
 
@@ -96,6 +98,18 @@ def test_health(client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
     assert response.json() == {"status": "ok"}
+
+
+def test_health_returns_503_when_database_is_down(client, monkeypatch):
+    def broken():
+        raise OperationalError("SELECT 1", {}, Exception("connection refused"))
+
+    monkeypatch.setattr(deps, "check_database", broken)
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database unavailable."}
 
 
 def test_full_flow_track_check_list_delete(client):

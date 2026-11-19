@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.application import usecases
 from app.domain.repo import DeployOutcome
@@ -86,4 +87,15 @@ def remove_repo(repo_id: str):
 
 @router.get("/health")
 def health():
+    """Readiness: el servicio responde y alcanza la base de datos.
+
+    Es lo que valida el smoke test del CD antes de promover una versión.
+    """
+    try:
+        from app.api import deps  # se conecta a la BD al importarse
+
+        deps.check_database()
+    # ImportError: otra petición concurrente vio fallar la importación de deps.
+    except (SQLAlchemyError, ImportError) as exc:
+        raise HTTPException(503, "Database unavailable.") from exc
     return {"status": "ok"}

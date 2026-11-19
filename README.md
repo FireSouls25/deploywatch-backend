@@ -80,7 +80,7 @@ Variables de entorno (`ver .env.example`):
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/api/health` | Salud del servicio |
+| `GET` | `/api/health` | Salud del servicio y de la base de datos (503 si no responde) |
 | `POST` | `/api/repos` `{url}` | Rastrear `owner/repo` o URL completa |
 | `GET` | `/api/repos` | Listar con su último chequeo |
 | `POST` | `/api/repos/{id}/check` | Verificación bajo demanda contra GitHub |

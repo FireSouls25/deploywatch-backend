@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
@@ -22,6 +23,13 @@ _session_factory = sessionmaker(bind=_engine)
 
 _repo_repo = SqlRepoRepository(_session_factory)
 _check_repo = SqlCheckRepository(_session_factory)
+
+
+
+def check_database() -> None:
+    """Lanza SQLAlchemyError si la base de datos no responde."""
+    with _engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
 
 
 @lru_cache
