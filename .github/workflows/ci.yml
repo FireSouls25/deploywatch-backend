@@ -33,7 +33,7 @@ jobs:
 
       - name: Pruebas + quality gate de cobertura (80 %)
         run: |
-          coverage run -m pytest -q
+          coverage run -m pytest -q --junitxml=test-results.xml
           coverage xml
           coverage html
           coverage report --fail-under=80

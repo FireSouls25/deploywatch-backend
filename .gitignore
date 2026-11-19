@@ -9,3 +9,4 @@ coverage.xml
 deploywatch.db
 .env
 htmlcov/
+test-results.xml
