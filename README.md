@@ -124,3 +124,17 @@ docker compose up --build
 El `compose` levanta `db` (Postgres 16) + `api`; la API espera a que la base
 pase su healthcheck. Ninguna credencial vive en el repositorio. El frontend vive en su propio
 repo y consume esta API por `/api`.
+
+## Despliegue continuo (CD)
+
+`.github/workflows/cd.yml` corre cuando el CI de `main` termina en verde:
+
+1. Construye la imagen y la publica en GHCR con el SHA del commit como etiqueta.
+2. `scripts/deploy.sh` levanta staging (Postgres + API) con la versión `:stable`
+   actual y la reemplaza por la nueva.
+3. **Smoke test** sobre `GET /api/health`. Si falla, **rollback** automático a
+   `:stable` y el pipeline queda en rojo. Si pasa, la imagen nueva se promueve a `:stable`.
+4. Si existen los secretos `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`, avisa por Telegram.
+
+Para demostrar el rollback: *Actions → cd → Run workflow* con `simular_fallo` marcado
+(despliega la versión nueva con una `DATABASE_URL` inválida).

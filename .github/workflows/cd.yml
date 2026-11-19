@@ -1,0 +1,91 @@
+name: cd
+
+# Se ejecuta solo cuando el CI de main terminó en verde (o a mano para demos).
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      simular_fallo:
+        description: "Desplegar con configuración rota para demostrar el rollback"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write # publicar la imagen en GHCR
+
+# Nunca dos despliegues a staging a la vez.
+concurrency:
+  group: staging
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      SIMULAR_FALLO: ${{ inputs.simular_fallo || 'false' }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Login en GHCR
+        env:
+          OWNER: ${{ github.repository_owner }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "IMAGE=ghcr.io/${OWNER,,}/deploywatch-backend" >> "$GITHUB_ENV"
+          echo "$TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
+
+      - name: Build y push de la imagen (etiqueta = SHA del commit)
+        run: |
+          docker build -t "$IMAGE:$SHA" .
+          docker push "$IMAGE:$SHA"
+
+      - name: Buscar la versión estable actual
+        id: stable
+        run: |
+          if docker pull "$IMAGE:stable" >/dev/null 2>&1; then
+            echo "image=$IMAGE:stable" >> "$GITHUB_OUTPUT"
+          else
+            echo "Primer despliegue: no hay versión estable todavía."
+          fi
+
+      - name: Desplegar en staging + smoke test (rollback si falla)
+        id: deploy
+        run: ./scripts/deploy.sh "$IMAGE:$SHA" "${{ steps.stable.outputs.image }}"
+
+      - name: Promover a estable
+        if: success() && env.SIMULAR_FALLO != 'true'
+        run: |
+          docker tag "$IMAGE:$SHA" "$IMAGE:stable"
+          docker push "$IMAGE:stable"
+
+      - name: Resumen
+        if: always()
+        env:
+          RESULTADO: ${{ steps.deploy.outputs.resultado || 'error' }}
+        run: |
+          {
+            echo "### Despliegue a staging: \`$RESULTADO\`"
+            echo "- Imagen: \`$IMAGE:$SHA\`"
+            echo "- Estable previa: \`${{ steps.stable.outputs.image || 'ninguna' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Opcional: solo se ejecuta si existen los secretos de Telegram.
+      - name: Aviso a Telegram
+        if: always() && env.TELEGRAM_BOT_TOKEN != ''
+        env:
+          RESULTADO: ${{ steps.deploy.outputs.resultado || 'error' }}
+        run: |
+          curl -sS "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d text="DeployWatch staging: $RESULTADO (${SHA::7})" >/dev/null
