@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /code
 
 # Solo dependencias de ejecución, versiones fijadas y únicamente wheels
-# (sin ejecutar scripts setup.py de terceros).
+# (sin ejecutar scripts setup.py de terceros) y verificadas por hash.
 COPY requirements.txt .
-RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
+RUN pip install --no-cache-dir --only-binary :all: --require-hashes -r requirements.txt
 
 COPY app ./app
 

@@ -106,8 +106,8 @@ coverage run -m pytest -q && coverage report
 Las versiones están fijadas. Se editan los `.in` y se regeneran los `.txt`:
 
 ```bash
-uv pip compile requirements.in -o requirements.txt
-uv pip compile requirements-dev.in -o requirements-dev.txt
+uv pip compile --generate-hashes --python-version 3.12 --python-platform linux requirements.in -o requirements.txt
+uv pip compile --generate-hashes --python-version 3.12 --python-platform linux requirements-dev.in -o requirements-dev.txt
 ```
 
 La imagen Docker instala solo `requirements.txt`, únicamente wheels y
