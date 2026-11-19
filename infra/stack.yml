@@ -28,11 +28,14 @@ Resources:
         deadLetterTargetArn: !GetAtt DeployEventsDLQ.Arn
         maxReceiveCount: 3
 
-  # Reporte JSON de cada despliegue, versionado y privado.
-  DeployReportsBucket:
+  # Destino de los logs de acceso del bucket de reportes.
+  AccessLogsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub deploywatch-${Entorno}-deploy-reports
+      BucketName: !Sub deploywatch-${Entorno}-access-logs
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -44,6 +47,63 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+
+  # Reporte JSON de cada despliegue: versionado, cifrado, privado y auditado.
+  DeployReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub deploywatch-${Entorno}-deploy-reports
+      LoggingConfiguration:
+        DestinationBucketName: !Ref AccessLogsBucket
+        LogFilePrefix: deploy-reports/
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Rechaza cualquier acceso sin TLS a los buckets.
+  AccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AccessLogsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: SoloHttps
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt AccessLogsBucket.Arn
+              - !Sub "${AccessLogsBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  DeployReportsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DeployReportsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: SoloHttps
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt DeployReportsBucket.Arn
+              - !Sub "${DeployReportsBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
 
 Outputs:
   QueueUrl:
