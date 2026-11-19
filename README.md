@@ -125,6 +125,21 @@ El `compose` levanta `db` (Postgres 16) + `api`; la API espera a que la base
 pase su healthcheck. Ninguna credencial vive en el repositorio. El frontend vive en su propio
 repo y consume esta API por `/api`.
 
+## Prueba de carga (Locust)
+
+`load/locustfile.py` simula usuarios con el panel abierto: registran un repo, consultan
+`GET /api/repos` y `GET /api/health`, y lo eliminan al salir. Al terminar aplica un
+**quality gate**: falla si la tasa de error supera el 1 % o el p95 supera 500 ms
+(`LOAD_MAX_FAIL_RATIO`, `LOAD_MAX_P95_MS`). En el CI corre el job `load` contra la API
+real sobre Postgres y publica el reporte HTML como artifact.
+
+```bash
+python -m venv .venv-load
+.venv-load/bin/pip install --only-binary ":all:" --require-hashes -r requirements-load.txt
+.venv-load/bin/locust -f load/locustfile.py --headless -u 30 -r 10 -t 45s \
+  --host http://localhost:8000
+```
+
 ## Despliegue continuo (CD)
 
 `.github/workflows/cd.yml` corre cuando el CI de `main` termina en verde:
