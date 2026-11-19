@@ -68,14 +68,15 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: deploywatch
-          POSTGRES_PASSWORD: carga-solo-ci
           POSTGRES_DB: deploywatch
+          # BD efímera del runner, solo accesible en localhost durante el job.
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U deploywatch"
           --health-interval 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://deploywatch:carga-solo-ci@localhost:5432/deploywatch
+      DATABASE_URL: postgresql+psycopg://deploywatch@localhost:5432/deploywatch
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

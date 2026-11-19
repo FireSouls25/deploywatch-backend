@@ -21,7 +21,7 @@ HEALTH_URL=http://localhost:8000/api/health
 
 PG_PASSWORD=$(openssl rand -hex 16)
 DB_URL="postgresql+psycopg://deploywatch:${PG_PASSWORD}@${DB}:5432/deploywatch"
-BROKEN_DB_URL="postgresql+psycopg://deploywatch:incorrecta@host-inexistente:5432/deploywatch"
+BROKEN_DB_URL="postgresql+psycopg://deploywatch@host-inexistente:5432/deploywatch"
 
 log() { echo "::group::$*"; }
 end() { echo "::endgroup::"; }
@@ -64,7 +64,10 @@ start_db
 if [[ -n "$STABLE_IMAGE" ]]; then
   log "Versión estable actual: $STABLE_IMAGE"
   run_api "$STABLE_IMAGE" "$DB_URL"
-  smoke_test
+  if ! smoke_test; then
+    echo "La versión estable no pasa el smoke test: no sirve como punto de rollback."
+    STABLE_IMAGE=""
+  fi
   end
 fi
 
