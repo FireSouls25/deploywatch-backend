@@ -1,0 +1,52 @@
+# Infraestructura como código (CloudFormation) de los eventos de despliegue.
+# Se aplica contra LocalStack en local y en el CD; el mismo template serviría
+# para una cuenta real de AWS.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: DeployWatch - cola de eventos y bucket de reportes de despliegue
+
+Parameters:
+  Entorno:
+    Type: String
+    Default: staging
+    AllowedValues: [staging, production]
+
+Resources:
+  # Mensajes que no se pudieron procesar tras 3 intentos.
+  DeployEventsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub deploywatch-${Entorno}-deploy-events-dlq
+      MessageRetentionPeriod: 1209600 # 14 días
+
+  # Un mensaje por despliegue: desplegado, rollback o fallido.
+  DeployEventsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub deploywatch-${Entorno}-deploy-events
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeployEventsDLQ.Arn
+        maxReceiveCount: 3
+
+  # Reporte JSON de cada despliegue, versionado y privado.
+  DeployReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub deploywatch-${Entorno}-deploy-reports
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  QueueUrl:
+    Value: !Ref DeployEventsQueue
+  BucketName:
+    Value: !Ref DeployReportsBucket

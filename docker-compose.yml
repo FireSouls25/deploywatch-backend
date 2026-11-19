@@ -21,5 +21,19 @@ services:
       db:
         condition: service_healthy
 
+  # Emulador de AWS para la infraestructura de infra/stack.yml.
+  # Solo arranca con: docker compose --profile infra up -d localstack
+  # Versión 4.14 fijada: las posteriores exigen LOCALSTACK_AUTH_TOKEN.
+  localstack:
+    profiles: [infra]
+    image: localstack/localstack:4.14@sha256:3ebc37595918b8accb852f8048fef2aff047d465167edd655528065b07bc364a
+    environment:
+      SERVICES: cloudformation,sqs,s3
+    ports: ["127.0.0.1:4566:4566"]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      retries: 20
+
 volumes:
   pgdata:

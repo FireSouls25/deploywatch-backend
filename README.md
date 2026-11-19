@@ -153,3 +153,26 @@ python -m venv .venv-load
 
 Para demostrar el rollback: *Actions → cd → Run workflow* con `simular_fallo` marcado
 (despliega la versión nueva con una `DATABASE_URL` inválida).
+
+## Infraestructura como código (LocalStack)
+
+`infra/stack.yml` es una plantilla de **CloudFormation** que declara la infraestructura de
+eventos de despliegue:
+
+- Cola SQS `deploywatch-<entorno>-deploy-events` con su cola de mensajes fallidos (DLQ, 3 reintentos).
+- Bucket S3 `deploywatch-<entorno>-deploy-reports`, versionado, cifrado y sin acceso público.
+
+Se aplica contra **LocalStack** (emulador de AWS); el CD la levanta como servicio, aplica
+la plantilla y registra cada despliegue (`desplegado`, `rollback` o `fallido`) como mensaje
+en SQS y como reporte JSON en S3.
+
+```bash
+docker compose --profile infra up -d localstack
+./infra/apply.sh staging          # idempotente: solo aplica diferencias
+./infra/publish-event.sh desplegado <sha> <imagen>
+./infra/read-events.sh staging
+```
+
+`infra/aws-local.sh` fuerza credenciales de prueba y el endpoint de LocalStack, así que
+nunca toca una cuenta real. LocalStack está fijado en 4.14: las versiones posteriores
+exigen `LOCALSTACK_AUTH_TOKEN`.

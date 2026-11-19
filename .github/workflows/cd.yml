@@ -27,6 +27,16 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: staging
+    # AWS emulado (IaC): cola de eventos y bucket de reportes de infra/stack.yml.
+    services:
+      localstack:
+        image: localstack/localstack:4.14@sha256:3ebc37595918b8accb852f8048fef2aff047d465167edd655528065b07bc364a
+        env:
+          SERVICES: cloudformation,sqs,s3
+        ports: ["4566:4566"]
+        options: >-
+          --health-cmd "curl -fs http://localhost:4566/_localstack/health"
+          --health-interval 5s --health-retries 20
     env:
       SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       SIMULAR_FALLO: ${{ inputs.simular_fallo || 'false' }}
@@ -50,6 +60,9 @@ jobs:
           docker build -t "$IMAGE:$SHA" .
           docker push "$IMAGE:$SHA"
 
+      - name: Aplicar infraestructura (CloudFormation en LocalStack)
+        run: ./infra/apply.sh staging
+
       - name: Buscar la versión estable actual
         id: stable
         run: |
@@ -68,6 +81,12 @@ jobs:
         run: |
           docker tag "$IMAGE:$SHA" "$IMAGE:stable"
           docker push "$IMAGE:stable"
+
+      - name: Registrar el despliegue (SQS + S3)
+        if: always() && steps.deploy.outcome != 'skipped'
+        run: |
+          ./infra/publish-event.sh "${{ steps.deploy.outputs.resultado || 'error' }}" "$SHA" "$IMAGE:$SHA" staging
+          ./infra/read-events.sh staging
 
       - name: Resumen
         if: always()
