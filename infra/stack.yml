@@ -28,11 +28,13 @@ Resources:
         deadLetterTargetArn: !GetAtt DeployEventsDLQ.Arn
         maxReceiveCount: 3
 
-  # Destino de los logs de acceso del bucket de reportes.
+  # Destino de los logs de acceso del bucket de reportes. LogDeliveryWrite
+  # permite que el servicio de logs de S3 escriba en él (y en ningún otro).
   AccessLogsBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub deploywatch-${Entorno}-access-logs
+      AccessControl: LogDeliveryWrite
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerPreferred
