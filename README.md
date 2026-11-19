@@ -140,6 +140,22 @@ python -m venv .venv-load
   --host http://localhost:8000
 ```
 
+## Demo local de todo el pipeline
+
+`scripts/demo-local.sh` reproduce en local, con Docker, cada etapa del pipeline:
+
+```bash
+./scripts/demo-local.sh            # todo, en orden (~3 min)
+./scripts/demo-local.sh pruebas    # lint, pruebas y gate de cobertura
+./scripts/demo-local.sh despliegue # imagen + staging + smoke test + promoción
+./scripts/demo-local.sh rollback   # configuración rota → rollback automático
+./scripts/demo-local.sh carga      # Locust contra staging, con quality gate
+./scripts/demo-local.sh iac        # LocalStack: aplicar plantilla, publicar y leer eventos
+./scripts/demo-local.sh limpiar
+```
+
+Necesita libres los puertos 8000 (staging) y 4566 (LocalStack).
+
 ## Despliegue continuo (CD)
 
 `.github/workflows/cd.yml` corre cuando el CI de `main` termina en verde:

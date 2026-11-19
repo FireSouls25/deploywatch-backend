@@ -13,3 +13,4 @@ test-results.xml
 .venv-load/
 locust-report.html
 api.log
+.venv-demo/
